@@ -1,11 +1,11 @@
-# Research Paper Assistant — A RAG System with Real Engineering Depth
+# Research Paper Assistant — A RAG System 
 
 Students waste hours hunting for relevant papers and then more hours decoding them.
 This is a retrieval-augmented agent that answers questions about a focused corpus
 of papers, compares papers against each other, and can pull in new papers live
 from arXiv — with every answer grounded in and cited back to the source text.
 
-This is **not** "built a chatbot with LangChain." It's built to demonstrate the
+This is built to demonstrate the
 engineering decisions that separate a toy RAG demo from something closer to a
 production system:
 
@@ -83,16 +83,6 @@ cheap, explainable lexical-overlap check that catches the common failure mode
 (citing a chunk sharing no real content with the sentence). Its limits are
 documented in the code, not hidden.
 
-## Setup
-
-```bash
-pip install -r requirements.txt
-cp .env.example .env   # add your OPENAI_API_KEY
-```
-
-Embeddings and re-ranking run locally via sentence-transformers — free, no API
-key needed. Only generation and the agent's tool-calling loop call OpenAI.
-
 ## Usage
 
 **1. Build your corpus** (pick a focused topic — don't try to index all of arXiv):
@@ -115,7 +105,7 @@ python -m scripts.run_eval
 Outputs a markdown table of recall@1/3/5 for every strategy × reranker
 combination — paste this straight into your own write-up.
 
-**4. Ask the agent questions** (this is the demo):
+**4. Ask the agent questions**:
 ```bash
 python -m scripts.ask
 > What dataset did [paper] use for evaluation?
@@ -126,8 +116,7 @@ python -m scripts.ask
 Each run prints the full tool-call trace — which tool was called, with what
 arguments, and the latency of each step — before the final answer.
 
-## Known limitations (worth stating up front, not discovering in an interview)
-
+## Known limitations 
 - The PDF parser is heuristic; it will mis-detect headings in unusual paper
   templates. GROBID would fix this at the cost of extra infrastructure.
 - The groundedness check is lexical-overlap based, not semantic — it catches
@@ -138,17 +127,3 @@ arguments, and the latency of each step — before the final answer.
 - Metadata filtering is post-hoc (over-fetch then filter), which is fine at
   this corpus size but wouldn't scale to millions of chunks without pushing
   filters into the index itself.
-
-## Suggested resume bullets
-
-> Built a research-paper RAG agent with section- and table-aware chunking,
-> two-stage retrieval (FAISS + cross-encoder re-ranking), and citation-grounded
-> generation with automated groundedness checks; empirically compared 3
-> chunking strategies, improving recall@5 by X% over naive fixed-window
-> chunking. Added a tool-calling agent layer (live arXiv search, citation-graph
-> traversal, paper summarization) with full latency/cost instrumentation per
-> pipeline stage.
-
-Fill in the X% from your own `scripts/run_eval.py` run — don't guess a number,
-measure it. An interviewer asking "how did you get that number" and you having
-a real answer is the entire point of this project.
