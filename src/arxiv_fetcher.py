@@ -1,4 +1,3 @@
-```python
 def search_arxiv(query: str, max_results: int = 10) -> List[ArxivPaper]:
     params = {
         "search_query": f"all:{query}",
@@ -94,4 +93,3 @@ def search_arxiv(query: str, max_results: int = 10) -> List[ArxivPaper]:
         )
 
     return papers
-```
