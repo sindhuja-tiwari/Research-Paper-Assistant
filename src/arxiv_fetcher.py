@@ -1,3 +1,4 @@
+import random
 import re
 import time
 import requests
@@ -24,6 +25,88 @@ class ArxivPaper:
         return int(self.published[:4])
 
 
+class ArxivRateLimitError(requests.HTTPError):
+    """arXiv kept answering 429 after all retries."""
+
+
+# arXiv asks clients to wait at least 3s between requests and to send a
+# descriptive User-Agent: https://info.arxiv.org/help/api/tou.html
+MIN_REQUEST_INTERVAL = 3.0
+MAX_ATTEMPTS = 5
+MAX_BACKOFF = 300
+
+_last_request_time = 0.0
+
+
+def _user_agent() -> str:
+    ua = "RAG-Paper-Assistant/1.0 (research paper discovery"
+    if config.ARXIV_CONTACT_EMAIL:
+        ua += f"; mailto:{config.ARXIV_CONTACT_EMAIL}"
+    return ua + ")"
+
+
+def _throttle() -> None:
+    """Keep at least MIN_REQUEST_INTERVAL seconds between arXiv requests."""
+    global _last_request_time
+    wait = MIN_REQUEST_INTERVAL - (time.monotonic() - _last_request_time)
+    if wait > 0:
+        time.sleep(wait)
+    _last_request_time = time.monotonic()
+
+
+def _retry_after(resp: requests.Response, default: float) -> float:
+    value = resp.headers.get("Retry-After")
+    try:
+        delay = float(value) if value else default
+    except ValueError:
+        delay = default
+    return min(max(delay, MIN_REQUEST_INTERVAL), MAX_BACKOFF)
+
+
+def _arxiv_get(url: str, timeout: int, **kwargs) -> requests.Response:
+    """GET an arXiv URL politely: throttled, retried, and with a clear 429 error."""
+    headers = {"User-Agent": _user_agent()}
+
+    for attempt in range(MAX_ATTEMPTS):
+        last_attempt = attempt == MAX_ATTEMPTS - 1
+        backoff = min(30 * 2 ** attempt, MAX_BACKOFF) + random.uniform(0, 5)
+        _throttle()
+        try:
+            resp = requests.get(url, headers=headers, timeout=timeout, **kwargs)
+        except requests.RequestException:
+            if last_attempt:
+                raise
+            delay = 5 * (attempt + 1)
+            print(f"arXiv request failed; waiting {delay}s before retry...")
+            time.sleep(delay)
+            continue
+
+        if resp.status_code == 429:
+            if last_attempt:
+                raise ArxivRateLimitError(
+                    f"arXiv is rate limiting this machine (HTTP 429) after "
+                    f"{MAX_ATTEMPTS} attempts. Wait 10-15 minutes without "
+                    f"sending any arXiv requests, then try again.",
+                    response=resp,
+                )
+            delay = _retry_after(resp, backoff)
+            print(f"arXiv rate limit (429), attempt {attempt + 1}/{MAX_ATTEMPTS}. "
+                  f"Waiting {delay:.0f}s before retry...")
+            time.sleep(delay)
+            continue
+
+        if resp.status_code in (500, 502, 503, 504) and not last_attempt:
+            delay = _retry_after(resp, 5 * (attempt + 1))
+            print(f"arXiv server error ({resp.status_code}); waiting {delay:.0f}s...")
+            time.sleep(delay)
+            continue
+
+        resp.raise_for_status()
+        return resp
+
+    raise RuntimeError("arXiv request failed after retries")
+
+
 def search_arxiv(query: str, max_results: int = 10) -> List[ArxivPaper]:
     """Search arXiv for papers matching a query."""
     params = {
@@ -33,49 +116,7 @@ def search_arxiv(query: str, max_results: int = 10) -> List[ArxivPaper]:
         "sortBy": "relevance",
         "sortOrder": "descending",
     }
-    headers = {"User-Agent": "RAG-Paper-Assistant/1.0 (research paper discovery)"}
-
-    for attempt in range(3):
-        try:
-            resp = requests.get(
-                config.ARXIV_API_URL,
-                params=params,
-                headers=headers,
-                timeout=30,
-            )
-
-            if resp.status_code == 429:
-                if attempt == 2:
-                    resp.raise_for_status()
-                retry_after = resp.headers.get("Retry-After")
-                try:
-                    delay = float(retry_after) if retry_after else 60 * (attempt + 1)
-                except ValueError:
-                    delay = 60 * (attempt + 1)
-                delay = min(max(delay, 1), 180)
-                print(f"arXiv rate limit (429). Waiting {delay:g}s before retry...")
-                time.sleep(delay)
-                continue
-
-            if resp.status_code in (500, 502, 503, 504):
-                if attempt == 2:
-                    resp.raise_for_status()
-                delay = 5 * (attempt + 1)
-                print(f"arXiv server error ({resp.status_code}); waiting {delay}s...")
-                time.sleep(delay)
-                continue
-
-            resp.raise_for_status()
-            break
-
-        except requests.RequestException:
-            if attempt == 2:
-                raise
-            delay = 5 * (attempt + 1)
-            print(f"arXiv request failed; waiting {delay}s before retry...")
-            time.sleep(delay)
-    else:
-        raise RuntimeError("arXiv request failed after retries")
+    resp = _arxiv_get(config.ARXIV_API_URL, timeout=30, params=params)
 
     root = ET.fromstring(resp.text)
     papers = []
@@ -126,14 +167,8 @@ def download_pdf(paper: ArxivPaper, dest_dir: Path = None) -> Path:
     if dest_path.exists():
         return dest_path
 
-    response = requests.get(
-        paper.pdf_url,
-        headers={"User-Agent": "RAG-Paper-Assistant/1.0"},
-        timeout=60,
-    )
-    response.raise_for_status()
+    response = _arxiv_get(paper.pdf_url, timeout=60)
     dest_path.write_bytes(response.content)
-    time.sleep(1)
     return dest_path
 
 
@@ -144,6 +179,8 @@ def build_corpus(query: str, max_results: int = 50) -> List[ArxivPaper]:
     for paper in papers:
         try:
             download_pdf(paper)
+        except ArxivRateLimitError:
+            raise
         except requests.RequestException as exc:
             print(f"  ! failed to download {paper.arxiv_id}: {exc}")
 

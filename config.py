@@ -29,7 +29,9 @@ TOP_K_RETRIEVE = 20    # first-stage vector retrieval
 TOP_K_RERANK = 5       # final number of chunks passed to the LLM after re-ranking
 
 # --- arXiv ---
-ARXIV_API_URL = "http://export.arxiv.org/api/query"
+ARXIV_API_URL = "https://export.arxiv.org/api/query"
+# Optional: arXiv asks API clients to identify themselves with a contact address.
+ARXIV_CONTACT_EMAIL = os.getenv("ARXIV_CONTACT_EMAIL")
 
 # --- Semantic Scholar (citation graph tool) ---
 SEMANTIC_SCHOLAR_API = "https://api.semanticscholar.org/graph/v1"
