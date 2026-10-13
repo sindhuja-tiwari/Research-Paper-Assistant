@@ -10,7 +10,7 @@ import sys
 import time
 
 import config
-from src.arxiv_fetcher import ArxivRateLimitError, build_corpus
+from src.arxiv_fetcher import ArxivRateLimitError, ArxivUnavailableError, build_corpus
 from src.pdf_parser import parse_and_cache
 from src.chunking import chunk_paper, STRATEGIES
 from src.embeddings import embed_texts, EmbeddingCache
@@ -68,7 +68,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     try:
         main(args.query, args.max_results)
-    except ArxivRateLimitError as e:
+    except (ArxivRateLimitError, ArxivUnavailableError) as e:
         print(f"\nError: {e}\nPDFs already downloaded are kept in {config.RAW_PDF_DIR}, "
               f"so the next run only fetches what is missing.", file=sys.stderr)
         sys.exit(1)

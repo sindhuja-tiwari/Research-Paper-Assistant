@@ -29,11 +29,18 @@ class ArxivRateLimitError(requests.HTTPError):
     """arXiv kept answering 429 after all retries."""
 
 
+class ArxivUnavailableError(requests.ConnectionError):
+    """arXiv kept timing out, refusing connections, or returning 5xx after all retries."""
+
+
 # arXiv asks clients to wait at least 3s between requests and to send a
 # descriptive User-Agent: https://info.arxiv.org/help/api/tou.html
 MIN_REQUEST_INTERVAL = 3.0
 MAX_ATTEMPTS = 5
 MAX_BACKOFF = 300
+# (connect, read) timeouts in seconds. arXiv search can be slow under load.
+SEARCH_TIMEOUT = (10, 90)
+PDF_TIMEOUT = (10, 120)
 
 _last_request_time = 0.0
 
@@ -63,8 +70,8 @@ def _retry_after(resp: requests.Response, default: float) -> float:
     return min(max(delay, MIN_REQUEST_INTERVAL), MAX_BACKOFF)
 
 
-def _arxiv_get(url: str, timeout: int, **kwargs) -> requests.Response:
-    """GET an arXiv URL politely: throttled, retried, and with a clear 429 error."""
+def _arxiv_get(url: str, timeout, **kwargs) -> requests.Response:
+    """GET an arXiv URL politely: throttled, retried, and with clear errors."""
     headers = {"User-Agent": _user_agent()}
 
     for attempt in range(MAX_ATTEMPTS):
@@ -73,11 +80,17 @@ def _arxiv_get(url: str, timeout: int, **kwargs) -> requests.Response:
         _throttle()
         try:
             resp = requests.get(url, headers=headers, timeout=timeout, **kwargs)
-        except requests.RequestException:
+        except (requests.Timeout, requests.ConnectionError) as exc:
+            reason = "timed out" if isinstance(exc, requests.Timeout) else "could not connect"
             if last_attempt:
-                raise
-            delay = 5 * (attempt + 1)
-            print(f"arXiv request failed; waiting {delay}s before retry...")
+                raise ArxivUnavailableError(
+                    f"arXiv {reason} on all {MAX_ATTEMPTS} attempts. arXiv may be "
+                    f"overloaded or blocking this machine. Wait 15-30 minutes, check "
+                    f"https://status.arxiv.org, then try again."
+                ) from exc
+            delay = min(15 * 2 ** attempt, 120) + random.uniform(0, 5)
+            print(f"arXiv request {reason}, attempt {attempt + 1}/{MAX_ATTEMPTS}. "
+                  f"Waiting {delay:.0f}s before retry...")
             time.sleep(delay)
             continue
 
@@ -95,8 +108,14 @@ def _arxiv_get(url: str, timeout: int, **kwargs) -> requests.Response:
             time.sleep(delay)
             continue
 
-        if resp.status_code in (500, 502, 503, 504) and not last_attempt:
-            delay = _retry_after(resp, 5 * (attempt + 1))
+        if resp.status_code in (500, 502, 503, 504):
+            if last_attempt:
+                raise ArxivUnavailableError(
+                    f"arXiv returned HTTP {resp.status_code} on all {MAX_ATTEMPTS} "
+                    f"attempts. Check https://status.arxiv.org and try again later.",
+                    response=resp,
+                )
+            delay = _retry_after(resp, min(15 * 2 ** attempt, 120))
             print(f"arXiv server error ({resp.status_code}); waiting {delay:.0f}s...")
             time.sleep(delay)
             continue
@@ -116,7 +135,7 @@ def search_arxiv(query: str, max_results: int = 10) -> List[ArxivPaper]:
         "sortBy": "relevance",
         "sortOrder": "descending",
     }
-    resp = _arxiv_get(config.ARXIV_API_URL, timeout=30, params=params)
+    resp = _arxiv_get(config.ARXIV_API_URL, timeout=SEARCH_TIMEOUT, params=params)
 
     root = ET.fromstring(resp.text)
     papers = []
@@ -167,7 +186,7 @@ def download_pdf(paper: ArxivPaper, dest_dir: Path = None) -> Path:
     if dest_path.exists():
         return dest_path
 
-    response = _arxiv_get(paper.pdf_url, timeout=60)
+    response = _arxiv_get(paper.pdf_url, timeout=PDF_TIMEOUT)
     dest_path.write_bytes(response.content)
     return dest_path
 
