@@ -1,0 +1,82 @@
+[
+  {
+    "question": "How does RAG-Sequence differ from RAG-Token in how retrieved documents are used during generation?",
+    "arxiv_id": "2005.11401",
+    "relevant_sections": []
+  },
+  {
+    "question": "Which pretrained seq2seq model does RAG use as its generator, and what is the non-parametric memory?",
+    "arxiv_id": "2005.11401",
+    "relevant_sections": []
+  },
+  {
+    "question": "How are in-batch negatives used to train the dense passage retriever?",
+    "arxiv_id": "2004.04906",
+    "relevant_sections": []
+  },
+  {
+    "question": "How much does a dense retriever improve top-20 passage retrieval accuracy over BM25 on Natural Questions?",
+    "arxiv_id": "2004.04906",
+    "relevant_sections": []
+  },
+  {
+    "question": "How is the knowledge retriever trained during masked language model pre-training in REALM?",
+    "arxiv_id": "2002.08909",
+    "relevant_sections": []
+  },
+  {
+    "question": "What is salient span masking and why does it help retrieval-augmented pre-training?",
+    "arxiv_id": "2002.08909",
+    "relevant_sections": []
+  },
+  {
+    "question": "How does Fusion-in-Decoder process multiple retrieved passages in the encoder and decoder?",
+    "arxiv_id": "2007.01282",
+    "relevant_sections": []
+  },
+  {
+    "question": "How does answer accuracy change as the number of retrieved passages given to the reader increases?",
+    "arxiv_id": "2007.01282",
+    "relevant_sections": []
+  },
+  {
+    "question": "What is the late interaction mechanism and how is the MaxSim operator used to score documents?",
+    "arxiv_id": "2004.12832",
+    "relevant_sections": []
+  },
+  {
+    "question": "How does late interaction allow document representations to be precomputed offline?",
+    "arxiv_id": "2004.12832",
+    "relevant_sections": []
+  },
+  {
+    "question": "How large is the retrieval database used by RETRO, measured in tokens?",
+    "arxiv_id": "2112.04426",
+    "relevant_sections": []
+  },
+  {
+    "question": "What is chunked cross-attention and how are retrieved neighbours incorporated into the model?",
+    "arxiv_id": "2112.04426",
+    "relevant_sections": []
+  },
+  {
+    "question": "How well does a retrieval-augmented model perform on Natural Questions with only 64 training examples?",
+    "arxiv_id": "2208.03299",
+    "relevant_sections": []
+  },
+  {
+    "question": "Which training objectives were compared for jointly training the retriever and the language model?",
+    "arxiv_id": "2208.03299",
+    "relevant_sections": []
+  },
+  {
+    "question": "What are reflection tokens and what do they let the model decide during generation?",
+    "arxiv_id": "2310.11511",
+    "relevant_sections": []
+  },
+  {
+    "question": "How does the model decide on demand whether to retrieve passages or skip retrieval?",
+    "arxiv_id": "2310.11511",
+    "relevant_sections": []
+  }
+]
