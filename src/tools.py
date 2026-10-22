@@ -3,8 +3,11 @@ Tools the agent can call. Each is a plain Python function plus an OpenAI
 function-calling schema. Keeping schema next to implementation avoids drift
 between the two.
 """
+import random
+import time
+from typing import List, Dict, Any, Optional
+
 import requests
-from typing import List, Dict, Any
 
 import config
 from src.arxiv_fetcher import search_arxiv
@@ -34,7 +37,11 @@ def tool_citation_graph(arxiv_id: str, direction: str = "citations") -> List[Dic
     url = f"{config.SEMANTIC_SCHOLAR_API}/paper/{paper_id}"
     params = {"fields": f"{field}.title,{field}.year,{field}.externalIds"}
 
-    resp = requests.get(url, params=params, timeout=15)
+    resp = _semantic_scholar_get(url, params)
+    if resp is None:
+        return [{"error": "Semantic Scholar is unreachable right now. Try again later."}]
+    if resp.status_code == 404:
+        return [{"error": f"Semantic Scholar has no record of arXiv:{arxiv_id}"}]
     if resp.status_code != 200:
         return [{"error": f"Semantic Scholar lookup failed ({resp.status_code})"}]
 
@@ -49,12 +56,36 @@ def tool_citation_graph(arxiv_id: str, direction: str = "citations") -> List[Dic
     return out
 
 
+def _semantic_scholar_get(url: str, params: Dict[str, Any],
+                          attempts: int = 3) -> Optional[requests.Response]:
+    """GET with a short retry on 429/5xx. The public API shares one rate limit
+    across all keyless users, so 429s are common. Setting SEMANTIC_SCHOLAR_API_KEY
+    in .env gives you your own quota."""
+    headers = {}
+    if config.SEMANTIC_SCHOLAR_API_KEY:
+        headers["x-api-key"] = config.SEMANTIC_SCHOLAR_API_KEY
+
+    resp = None
+    for attempt in range(attempts):
+        try:
+            resp = requests.get(url, params=params, headers=headers, timeout=15)
+        except (requests.Timeout, requests.ConnectionError):
+            resp = None
+        else:
+            if resp.status_code not in (429, 500, 502, 503, 504):
+                return resp
+        if attempt < attempts - 1:
+            time.sleep(2 * 2 ** attempt + random.uniform(0, 1))
+    return resp
+
+
 # ---------- Tool 3: paper summarizer ----------
 def tool_summarize_paper(arxiv_id: str) -> Dict[str, Any]:
     """Returns the abstract plus section headings so the agent can give a fast
     TL;DR without doing a full retrieval + generation pass."""
     from src.pdf_parser import ParsedPaper  # local import avoids circular import at module load
-    path = config.PROCESSED_DIR / f"{arxiv_id.replace('/', '_')}.json"
+    from src.arxiv_fetcher import safe_filename
+    path = config.PROCESSED_DIR / f"{safe_filename(arxiv_id)}.json"
     if not path.exists():
         return {"error": "Paper not indexed locally. Use search_arxiv first, then ingest it."}
     paper = ParsedPaper.from_json(path)

@@ -7,7 +7,7 @@ fast-but-approximate (FAISS) narrows the field, slow-but-accurate (cross-encoder
 picks the final answer set. We measure the accuracy/latency trade-off in eval.py.
 """
 import time
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 
 from sentence_transformers import CrossEncoder
 
@@ -24,14 +24,14 @@ def get_reranker() -> CrossEncoder:
 
 
 def rerank(query: str, candidates: List[Dict[str, Any]],
-           top_k: int = config.TOP_K_RERANK) -> List[Dict[str, Any]]:
+           top_k: int = config.TOP_K_RERANK) -> Tuple[List[Dict[str, Any]], float]:
     """
     candidates: list of {"chunk": Chunk, "score": float} from vector_store.search()
-    Returns the top_k re-ordered by cross-encoder relevance, with timing attached
+    Returns (top_k re-ordered by cross-encoder relevance, re-rank latency in ms)
     so you can report the latency this stage adds.
     """
     if not candidates:
-        return []
+        return [], 0.0
 
     model = get_reranker()
     pairs = [(query, c["chunk"].text) for c in candidates]

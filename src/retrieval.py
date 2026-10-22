@@ -21,7 +21,8 @@ class RetrievalPipeline:
         self.store = VectorStore(strategy)
         if not self.store.load():
             raise RuntimeError(
-                f"No index found for strategy '{strategy}'. Run scripts/ingest.py first."
+                f"No index found for strategy '{strategy}'. Build one first, e.g.\n"
+                f"  python -m scripts.ingest --query \"retrieval augmented generation\" --max_results 20"
             )
         self.cache = EmbeddingCache()
 

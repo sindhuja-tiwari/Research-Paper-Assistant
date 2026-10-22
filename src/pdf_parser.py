@@ -172,7 +172,8 @@ def parse_pdf(pdf_path: Path, arxiv_id: str, title: str, authors: List[str],
 def parse_and_cache(pdf_path: Path, arxiv_id: str, title: str, authors: List[str],
                      year: int, abstract: str, force: bool = False) -> ParsedPaper:
     """Parse a PDF and cache the structured result as JSON so re-runs are instant."""
-    out_path = config.PROCESSED_DIR / f"{arxiv_id.replace('/', '_')}.json"
+    from src.arxiv_fetcher import safe_filename
+    out_path = config.PROCESSED_DIR / f"{safe_filename(arxiv_id)}.json"
     if out_path.exists() and not force:
         return ParsedPaper.from_json(out_path)
 

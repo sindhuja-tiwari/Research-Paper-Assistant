@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Secrets
+.env
+
+# Generated data: PDFs, parsed papers, embedding cache, FAISS indexes
+data/
+
+# Eval scaffold (the filled-in eval/questions.json is kept)
+eval/questions_template.json
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
