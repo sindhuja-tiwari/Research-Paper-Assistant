@@ -4,6 +4,7 @@ End-to-end ingestion: search arXiv -> download PDFs -> parse -> chunk (all
 
 Usage:
     python -m scripts.ingest --query "retrieval augmented generation" --max_results 40
+    python -m scripts.ingest --ids_file eval/corpus_ids.txt   # fixed corpus used by eval/questions.json
 """
 import argparse
 import sys
@@ -19,9 +20,12 @@ from src.embeddings import embed_texts, EmbeddingCache
 from src.vector_store import VectorStore
 
 
-def main(query: str, max_results: int):
-    print(f"Searching arXiv for '{query}' (max {max_results} papers)...")
-    papers = build_corpus(query, max_results=max_results)
+def main(query: str = None, max_results: int = 40, arxiv_ids=None):
+    if arxiv_ids:
+        print(f"Fetching {len(arxiv_ids)} papers from arXiv by id...")
+    else:
+        print(f"Searching arXiv for '{query}' (max {max_results} papers)...")
+    papers = build_corpus(query, max_results=max_results, arxiv_ids=arxiv_ids)
     print(f"Downloaded {len(papers)} papers.\n")
 
     print("Parsing PDFs into sections/tables...")
@@ -68,12 +72,21 @@ def main(query: str, max_results: int):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--query", type=str, required=True,
-                         help="arXiv search query defining your corpus, e.g. 'efficient transformers'")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--query", type=str,
+                        help="arXiv search query defining your corpus, e.g. 'efficient transformers'")
+    source.add_argument("--ids_file", type=str,
+                        help="text file with one arXiv id per line (# comments allowed)")
     parser.add_argument("--max_results", type=int, default=40)
     args = parser.parse_args()
+
+    ids = None
+    if args.ids_file:
+        with open(args.ids_file) as f:
+            ids = [line.split("#")[0].strip() for line in f]
+        ids = [i for i in ids if i]
     try:
-        main(args.query, args.max_results)
+        main(args.query, args.max_results, arxiv_ids=ids)
     except (ArxivRateLimitError, ArxivUnavailableError) as e:
         print(f"\nError: {e}\nPDFs already downloaded are kept in {config.RAW_PDF_DIR}, "
               f"so the next run only fetches what is missing.", file=sys.stderr)

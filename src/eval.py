@@ -19,6 +19,7 @@ simple but defensible proxy -- exact chunk-level ground truth would require
 hand-labeling every chunk, which doesn't scale for a solo project.
 """
 import json
+import re
 import time
 from pathlib import Path
 from typing import List, Dict, Any
@@ -40,8 +41,13 @@ def load_eval_set(path: Path = config.EVAL_DIR / "questions.json") -> List[Dict[
     return questions
 
 
+def _base_id(arxiv_id: str) -> str:
+    """'2005.11401v4' -> '2005.11401', so eval labels don't depend on versions."""
+    return re.sub(r"v\d+$", "", arxiv_id)
+
+
 def _is_relevant(chunk, question: Dict[str, Any]) -> bool:
-    if chunk.arxiv_id != question["arxiv_id"]:
+    if _base_id(chunk.arxiv_id) != _base_id(question["arxiv_id"]):
         return False
     rel_sections = question.get("relevant_sections")
     if not rel_sections:

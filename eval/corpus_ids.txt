@@ -1,0 +1,10 @@
+# Fixed corpus for the retrieval eval in eval/questions.json.
+# Build it with:  python -m scripts.ingest --ids_file eval/corpus_ids.txt
+2005.11401  # Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks (RAG)
+2004.04906  # Dense Passage Retrieval for Open-Domain Question Answering (DPR)
+2002.08909  # REALM: Retrieval-Augmented Language Model Pre-Training
+2007.01282  # Leveraging Passage Retrieval with Generative Models (Fusion-in-Decoder)
+2004.12832  # ColBERT: Efficient and Effective Passage Search via Late Interaction
+2112.04426  # Improving Language Models by Retrieving from Trillions of Tokens (RETRO)
+2208.03299  # Atlas: Few-shot Learning with Retrieval Augmented Language Models
+2310.11511  # Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection

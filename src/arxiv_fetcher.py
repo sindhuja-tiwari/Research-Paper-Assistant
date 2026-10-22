@@ -141,8 +141,20 @@ def search_arxiv(query: str, max_results: int = 10) -> List[ArxivPaper]:
         "sortOrder": "descending",
     }
     resp = _arxiv_get(config.ARXIV_API_URL, timeout=SEARCH_TIMEOUT, params=params)
+    return parse_feed(resp.text)
 
-    root = ET.fromstring(resp.text)
+
+def fetch_by_ids(arxiv_ids: List[str]) -> List[ArxivPaper]:
+    """Fetch metadata for specific arXiv ids (e.g. '2005.11401'), so a corpus
+    can be rebuilt exactly, which keeps eval results reproducible."""
+    params = {"id_list": ",".join(arxiv_ids), "max_results": len(arxiv_ids)}
+    resp = _arxiv_get(config.ARXIV_API_URL, timeout=SEARCH_TIMEOUT, params=params)
+    return parse_feed(resp.text)
+
+
+def parse_feed(xml_text: str) -> List[ArxivPaper]:
+    """Turn an arXiv Atom feed into ArxivPaper objects."""
+    root = ET.fromstring(xml_text)
     papers = []
 
     for entry in root.findall("atom:entry", ARXIV_NS):
@@ -195,9 +207,13 @@ def download_pdf(paper: ArxivPaper, dest_dir: Path = None) -> Path:
     return dest_path
 
 
-def build_corpus(query: str, max_results: int = 50) -> List[ArxivPaper]:
-    """Search for papers and download their PDFs."""
-    papers = search_arxiv(query, max_results=max_results)
+def build_corpus(query: str = None, max_results: int = 50,
+                 arxiv_ids: List[str] = None) -> List[ArxivPaper]:
+    """Search for papers (or fetch specific ids) and download their PDFs."""
+    if arxiv_ids:
+        papers = fetch_by_ids(arxiv_ids)
+    else:
+        papers = search_arxiv(query, max_results=max_results)
 
     for paper in papers:
         try:
