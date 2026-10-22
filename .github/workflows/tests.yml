@@ -13,16 +13,17 @@ jobs:
       matrix:
         python-version: ["3.9", "3.12"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: pip
+      - uses: actions/checkout@v5
+      # uv installs any Python version itself, so 3.9 still works on runners
+      # whose images no longer ship it.
+      - uses: astral-sh/setup-uv@v6
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          uv venv --python ${{ matrix.python-version }} .venv
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+          echo "VIRTUAL_ENV=$PWD/.venv" >> "$GITHUB_ENV"
           # CPU-only torch keeps the install small; the tests never load a model.
-          pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install -r requirements-dev.txt
+          VIRTUAL_ENV=$PWD/.venv uv pip install torch --index-url https://download.pytorch.org/whl/cpu
+          VIRTUAL_ENV=$PWD/.venv uv pip install -r requirements-dev.txt
       - name: Run tests
         run: pytest
