@@ -87,6 +87,11 @@ def tool_summarize_paper(arxiv_id: str) -> Dict[str, Any]:
     from src.arxiv_fetcher import safe_filename
     path = config.PROCESSED_DIR / f"{safe_filename(arxiv_id)}.json"
     if not path.exists():
+        # Indexed files carry a version suffix (2005.11401v4); accept the bare id too.
+        matches = sorted(config.PROCESSED_DIR.glob(f"{safe_filename(arxiv_id)}v*.json"))
+        if matches:
+            path = matches[-1]
+    if not path.exists():
         return {"error": "Paper not indexed locally. Use search_arxiv first, then ingest it."}
     paper = ParsedPaper.from_json(path)
     return {
