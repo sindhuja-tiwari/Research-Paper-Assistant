@@ -146,9 +146,40 @@ pytest
 
 ## Results
 
-Recall@k on the fixed corpus (`eval/questions.json`, 16 questions, paper-level relevance):
+Recall@k on the fixed 8-paper corpus (`eval/questions.json`, 16 questions). A question counts as
+a hit when a chunk from the correct paper appears in the top k.
 
-<!-- Paste the table printed by `python -m scripts.run_eval` here. -->
+| Strategy | recall@1 | recall@3 | recall@5 | avg query time |
+|---|---|---|---|---|
+| naive (no rerank) | 0.812 | 0.875 | 0.875 | 189 ms |
+| naive + rerank | **0.938** | **1.0** | **1.0** | 8.9 s |
+| section (no rerank) | 0.688 | 0.812 | 0.938 | 30 ms |
+| section + rerank | 0.875 | **1.0** | **1.0** | 8.0 s |
+| section_table (no rerank) | 0.688 | 0.812 | 0.938 | 26 ms |
+| section_table + rerank | 0.875 | **1.0** | **1.0** | 19.9 s |
+
+Corpus: 381 naive chunks, 614 section chunks, and 625 section+table chunks (11 tables). Measured
+on a MacBook Air CPU with Python 3.9.
+
+**What this shows**
+
+- **Re-ranking is the biggest win.** It lifts recall@1 by 12 to 19 points and brings recall@3 to
+  1.0 for every strategy. The cost is latency: scoring 20 candidates with a cross-encoder on a
+  laptop CPU takes seconds per query, against tens of milliseconds for vector search alone. The
+  timings include loading the model and vary from run to run on a laptop, so treat them as an
+  order of magnitude. A GPU, fewer candidates (`TOP_K_RETRIEVE`) or a smaller cross-encoder
+  would all cut it.
+- **Naive chunking does better than expected without re-ranking.** It scores 0.812 recall@1,
+  against 0.688 for section chunks. This metric only asks for the right *paper*. Overlapping
+  300-word windows repeat key terms across neighbouring chunks, which helps a paper-level match.
+  Section-aware chunking is meant to keep a method or result in one piece for *generation*, and a
+  paper-level recall metric can't see that. Section-level labels would test it properly.
+- **Table chunks don't move paper-level recall.** These questions are about methods, not numbers,
+  and only 11 of 625 chunks are tables. Table-specific questions such as "what accuracy did
+  Table 2 report?" are the natural next addition to the eval set.
+- **The embedding cache works as intended.** On ingest, the section+table index reused 614 cached
+  embeddings and computed only the 11 new table chunks. That took 1.7 s, against 62 s for the
+  section index.
 
 ## Troubleshooting
 
@@ -184,5 +215,8 @@ Research-Paper-Assistant/
   subtle misattribution.
 - The cross-paper comparison metric is a simplification (paper-level, optionally section-level
   match) rather than exact chunk-level ground truth, which would require hand-labelling every chunk.
+- The eval set is small (8 papers, 16 questions) and labelled at paper level, so a few questions
+  swing recall by 6 points each. It is a sanity check for comparing configurations, not a
+  benchmark.
 - Metadata filtering is applied after retrieval (over-fetch, then filter). That is fine at this
   corpus size but would not scale to millions of chunks without pushing filters into the index.
