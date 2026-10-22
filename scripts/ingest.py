@@ -10,7 +10,9 @@ import sys
 import time
 
 import config
-from src.arxiv_fetcher import ArxivRateLimitError, ArxivUnavailableError, build_corpus
+from src.arxiv_fetcher import (
+    ArxivRateLimitError, ArxivUnavailableError, build_corpus, safe_filename,
+)
 from src.pdf_parser import parse_and_cache
 from src.chunking import chunk_paper, STRATEGIES
 from src.embeddings import embed_texts, EmbeddingCache
@@ -25,7 +27,7 @@ def main(query: str, max_results: int):
     print("Parsing PDFs into sections/tables...")
     parsed_papers = []
     for p in papers:
-        pdf_path = config.RAW_PDF_DIR / f"{p.arxiv_id.replace('/', '_')}.pdf"
+        pdf_path = config.RAW_PDF_DIR / f"{safe_filename(p.arxiv_id)}.pdf"
         if not pdf_path.exists():
             continue
         try:
@@ -37,6 +39,10 @@ def main(query: str, max_results: int):
         except Exception as e:
             print(f"  ! failed to parse {p.arxiv_id}: {e}")
     print(f"Parsed {len(parsed_papers)} papers.\n")
+    if not parsed_papers:
+        print("No papers could be parsed, so there is nothing to index. "
+              "Try a broader --query.", file=sys.stderr)
+        sys.exit(1)
 
     cache = EmbeddingCache()
     for strategy in STRATEGIES:

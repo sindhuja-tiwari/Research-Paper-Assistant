@@ -33,7 +33,11 @@ def load_eval_set(path: Path = config.EVAL_DIR / "questions.json") -> List[Dict[
             f"No eval set at {path}. Create one -- see the docstring in src/eval.py "
             "for the expected format, or run scripts/build_eval_template.py."
         )
-    return json.loads(path.read_text())
+    questions = json.loads(path.read_text())
+    questions = [q for q in questions if not q["question"].startswith("TODO")]
+    if not questions:
+        raise ValueError(f"{path} has no real questions yet (only TODO placeholders).")
+    return questions
 
 
 def _is_relevant(chunk, question: Dict[str, Any]) -> bool:

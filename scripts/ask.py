@@ -8,25 +8,45 @@ Usage:
     python -m scripts.ask --query "Compare how paper X and paper Y handle long context"
 """
 import argparse
+import sys
+
+from openai import OpenAIError
 
 from src.agent import ResearchAgent, print_trace
 
 
 def main(strategy: str, use_reranker: bool, query: str = None):
-    agent = ResearchAgent(strategy=strategy, use_reranker=use_reranker)
+    try:
+        agent = ResearchAgent(strategy=strategy, use_reranker=use_reranker)
+    except RuntimeError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
     if query:
-        trace = agent.run(query)
-        print_trace(trace)
+        _ask(agent, query)
         return
 
     print("Research Paper Assistant (type 'quit' to exit)")
     while True:
-        q = input("\n> ").strip()
+        try:
+            q = input("\n> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+        if not q:
+            continue
         if q.lower() in ("quit", "exit"):
             break
-        trace = agent.run(q)
-        print_trace(trace)
+        _ask(agent, q)
+
+
+def _ask(agent: ResearchAgent, query: str):
+    try:
+        print_trace(agent.run(query))
+    except OpenAIError as e:
+        print(f"OpenAI request failed: {e}", file=sys.stderr)
+    except KeyboardInterrupt:
+        print("\n(cancelled)")
 
 
 if __name__ == "__main__":

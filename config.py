@@ -6,15 +6,15 @@ load_dotenv()
 ROOT_DIR = Path(__file__).parent
 DATA_DIR = ROOT_DIR / "data"
 RAW_PDF_DIR = DATA_DIR / "raw_pdfs"
-PROCESSED_DIR = DATA_DIR / "processed"       
-CACHE_DIR = DATA_DIR / "cache"               
-INDEX_DIR = DATA_DIR / "index"               
+PROCESSED_DIR = DATA_DIR / "processed"
+CACHE_DIR = DATA_DIR / "cache"
+INDEX_DIR = DATA_DIR / "index"
 EVAL_DIR = ROOT_DIR / "eval"
 
 for d in [RAW_PDF_DIR, PROCESSED_DIR, CACHE_DIR, INDEX_DIR, EVAL_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
-EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"   
+EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 LLM_MODEL = "gpt-4o-mini"
@@ -35,3 +35,5 @@ ARXIV_CONTACT_EMAIL = os.getenv("ARXIV_CONTACT_EMAIL")
 
 # --- Semantic Scholar (citation graph tool) ---
 SEMANTIC_SCHOLAR_API = "https://api.semanticscholar.org/graph/v1"
+# Optional: a free key from semanticscholar.org/product/api avoids shared rate limits.
+SEMANTIC_SCHOLAR_API_KEY = os.getenv("SEMANTIC_SCHOLAR_API_KEY")

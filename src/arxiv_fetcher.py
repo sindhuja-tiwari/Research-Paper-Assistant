@@ -126,6 +126,11 @@ def _arxiv_get(url: str, timeout, **kwargs) -> requests.Response:
     raise RuntimeError("arXiv request failed after retries")
 
 
+def safe_filename(arxiv_id: str) -> str:
+    """File-safe form of an arXiv id, e.g. 'hep-th/9901001v1' -> 'hep-th_9901001v1'."""
+    return re.sub(r"[^\w.-]", "_", arxiv_id)
+
+
 def search_arxiv(query: str, max_results: int = 10) -> List[ArxivPaper]:
     """Search arXiv for papers matching a query."""
     params = {
@@ -180,8 +185,7 @@ def download_pdf(paper: ArxivPaper, dest_dir: Path = None) -> Path:
         dest_dir = config.RAW_PDF_DIR
 
     dest_dir.mkdir(parents=True, exist_ok=True)
-    safe_id = re.sub(r"[^\w.-]", "_", paper.arxiv_id)
-    dest_path = dest_dir / f"{safe_id}.pdf"
+    dest_path = dest_dir / f"{safe_filename(paper.arxiv_id)}.pdf"
 
     if dest_path.exists():
         return dest_path

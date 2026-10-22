@@ -57,6 +57,10 @@ class AgentTrace:
 
 class ResearchAgent:
     def __init__(self, strategy: str = "section_table", use_reranker: bool = True):
+        if not config.OPENAI_API_KEY:
+            raise RuntimeError(
+                "OPENAI_API_KEY is not set. Copy .env.example to .env and add your key."
+            )
         self.client = OpenAI(api_key=config.OPENAI_API_KEY)
         self.retrieval = RetrievalPipeline(strategy=strategy, use_reranker=use_reranker)
 
@@ -83,13 +87,24 @@ class ResearchAgent:
         self._last_generation: Optional[GenerationResult] = None
 
     def _dispatch(self, name: str, args: Dict[str, Any]) -> str:
+        """Run one tool call. Any failure (network down, bad arguments, unknown
+        tool) is returned to the model as an error message instead of crashing
+        the conversation, so the agent can retry or answer without that tool."""
+        try:
+            return self._call_tool(name, args)
+        except Exception as exc:
+            return json.dumps({"error": f"{name} failed: {type(exc).__name__}: {exc}"})
+
+    def _call_tool(self, name: str, args: Dict[str, Any]) -> str:
         if name == "search_local_papers":
             retrieved = self.retrieval.retrieve(args["question"], year_min=args.get("year_min"))
             gen = generate_answer(args["question"], retrieved["results"])
             self._last_generation = gen
             return gen.answer
         else:
-            fn = TOOL_DISPATCH[name]
+            fn = TOOL_DISPATCH.get(name)
+            if fn is None:
+                return json.dumps({"error": f"Unknown tool '{name}'"})
             result = fn(**args)
             return json.dumps(result)
 
@@ -114,16 +129,20 @@ class ResearchAgent:
             trace.total_tokens += resp.usage.total_tokens
 
             if not msg.tool_calls:
-                trace.final_answer = msg.content
+                trace.final_answer = msg.content or ""
                 break
 
             messages.append(msg)
             for tool_call in msg.tool_calls:
                 name = tool_call.function.name
-                args = json.loads(tool_call.function.arguments)
-
                 t0 = time.time()
-                result_str = self._dispatch(name, args)
+                try:
+                    args = json.loads(tool_call.function.arguments or "{}")
+                except json.JSONDecodeError:
+                    args = {}
+                    result_str = json.dumps({"error": "Tool arguments were not valid JSON"})
+                else:
+                    result_str = self._dispatch(name, args)
                 elapsed_ms = (time.time() - t0) * 1000
 
                 trace.steps.append(AgentStep(
